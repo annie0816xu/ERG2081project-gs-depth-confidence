@@ -16,6 +16,8 @@ from matplotlib.patches import Rectangle
 from matplotlib.ticker import MaxNLocator
 import numpy as np
 
+from gsdepth.tools.prepare_ray_cases import DATASETS as RAY_DATASETS, paired_rows
+
 
 INK = "#26364a"
 MUTED = "#56667a"
@@ -274,6 +276,104 @@ def case_figure(directory, source_data, provenance, audit):
     save(figure, directory / "fig2_comparison", audit)
 
 
+def ray_metrics_figure(directory, evidence, source_data, audit):
+    pairs = paired_rows(evidence)
+    with (source_data / "fig4_ray_depth_paired.csv").open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=pairs[0])
+        writer.writeheader()
+        writer.writerows(pairs)
+
+    figure, (change, tail) = plt.subplots(1, 2, figsize=(7.16, 2.72), sharey=True)
+    figure.subplots_adjust(left=.177, right=.970, top=.87, bottom=.28, wspace=.22)
+    heading(change, "a", "Paired MAE change")
+    heading(tail, "b", "Pixels with error above 0.05")
+    change.axvline(0, color=GRAY, lw=.85, linestyle="--", zorder=0)
+    labels = []
+    shifts = np.linspace(-.125, .125, 8)
+    for index, (dataset, label) in enumerate(RAY_DATASETS.items()):
+        scores = [row for row in pairs if row["dataset"] == dataset]
+        deltas = 1000 * np.array([row["delta_mae"] for row in scores])
+        labels.append(f"{label}  {np.count_nonzero(deltas < 0)}/8")
+        change.scatter(deltas, index + shifts, s=20, c=np.where(deltas < 0, TEAL, AMBER), linewidths=0)
+        change.scatter(deltas.mean(), index, marker="D", s=33, color=INK, edgecolor="white", linewidth=.55, zorder=4)
+
+        size = sum(row["valid"] for row in scores)
+        before, after = (sum(row[field] for row in scores) for field in ("center_bad", "ray_bad"))
+        left, right = 100 * after / size, 100 * before / size
+        tail.plot([left, right], [index + .045, index - .045], color=GRAY, lw=1.25, zorder=1)
+        tail.scatter(right, index - .045, s=27, facecolor="white", edgecolor=MUTED, linewidth=1.0, zorder=2)
+        tail.scatter(left, index + .045, s=24, color=BLUE, edgecolor="white", linewidth=.4, zorder=3)
+        tail.text(max(left, right) + .60, index, f"{after - before:+,}", va="center", fontsize=7, color=BLUE)
+
+    change.set(yticks=np.arange(len(labels)), yticklabels=labels, ylim=(2.54, -.54), xlim=(-6.7, 3.2),
+               xlabel="Δ MAE (0.001 scene units)")
+    tail.set(xlim=(5, 22.2), xticks=[5, 10, 15, 20], xlabel="Share of valid pixels (%)")
+    for axis in (change, tail):
+        axis.spines[["top", "right", "left"]].set_visible(False)
+        axis.tick_params(axis="y", length=0)
+        axis.tick_params(axis="x", length=2.5, width=.7)
+        axis.set_axisbelow(True)
+    tail.tick_params(labelleft=False)
+
+    left_legend = [Line2D([0], [0], color=color, marker=marker, linestyle="", markersize=4.2, label=label)
+                   for marker, color, label in (("o", TEAL, "Lower"), ("o", AMBER, "Higher"), ("D", INK, "View mean"))]
+    right_legend = [Line2D([0], [0], marker="o", linestyle="", markerfacecolor=fill, markeredgecolor=edge,
+                           markersize=4.2, label=label)
+                    for fill, edge, label in (("white", MUTED, "Center depth"), (BLUE, BLUE, "Ray depth"))]
+    figure.legend(handles=left_legend, loc="lower center", bbox_to_anchor=(.355, .025), ncols=3,
+                  handletextpad=.3, columnspacing=.9)
+    figure.legend(handles=right_legend, loc="lower center", bbox_to_anchor=(.792, .025), ncols=2,
+                  handletextpad=.3, columnspacing=1.25)
+    save(figure, directory / "fig4_ray_depth_metrics", audit)
+
+
+def ray_case_figure(directory, source_data, audit):
+    provenance = json.loads((source_data / "ray_case_provenance.json").read_text(encoding="utf-8"))
+    figure, axes = plt.subplots(3, 5, figsize=(7.16, 5.8))
+    figure.subplots_adjust(left=.03, right=.97, top=.89, bottom=.155, wspace=.075, hspace=.45)
+    cmap = plt.get_cmap("cividis").with_extremes(bad="#eaecf0")
+    delta_cmap = plt.get_cmap("RdBu_r").with_extremes(bad="#d7dbe1")
+    columns = ("Input RGB", "Reference depth", "Center depth + 5%", "Ray depth + 5%", "Error change")
+    for axis, label in zip(axes[0], columns):
+        axis.set_title(label, pad=5, fontweight="bold", fontsize=8)
+
+    for row, case in enumerate(provenance["examples"]):
+        dataset = case["dataset"]
+        with np.load(source_data / f"ray_case_{dataset}.npz") as arrays:
+            rgb, valid = arrays["full_rgb"], arrays["valid"]
+            truth, center, ray = (np.where(valid, arrays[key], np.nan) for key in ("truth", "center", "ray"))
+        for axis in axes[row]:
+            axis.set_axis_off()
+        left, top, width, height = case["crop_xywh"]
+        input_axis = axes[row, 0]
+        input_axis.imshow(rgb, interpolation="nearest")
+        outline(input_axis, (left - .5, top - .5), (width, height), "#ffde68")
+        change = np.abs(ray - truth) - np.abs(center - truth)
+        row_color = BLUE if case["delta_mae"] < 0 else AMBER
+        title = f"({chr(97 + row)}) {RAY_DATASETS[dataset]} · view {case['view']}"
+        figure.text(.031, input_axis.get_position().y1 + (.062 if row == 0 else .038),
+                    title, fontsize=9, fontweight="bold", color=row_color)
+
+        depths = np.stack((truth, center, ray))
+        lo = np.floor(np.nanmin(depths) * 10) / 10
+        hi = np.ceil(np.nanmax(depths) * 10) / 10
+        if lo == hi:
+            hi = lo + .1
+        for axis, depth in zip(axes[row, 1:4], depths):
+            depth_image = axis.imshow(depth, interpolation="nearest", cmap=cmap, vmin=lo, vmax=hi)
+        delta_axis = axes[row, 4]
+        diff = delta_axis.imshow(change, interpolation="nearest", cmap=delta_cmap, vmin=-.10, vmax=.10)
+        delta_axis.text(.5, -.065, f"View Δ MAE {case['delta_mae']:+.4f}", transform=delta_axis.transAxes,
+                        ha="center", va="top", color=row_color, fontweight="bold", fontsize=7)
+        bar = scale_bar(figure, depth_image, [.330, axes[row, 2].get_position().y0 - .031, .34, .010],
+                        [lo, hi], [f"{lo:.1f}", f"{hi:.1f}"])
+        bar.set_label("Depth (scene units)", labelpad=-5, fontsize=7)
+
+    bar = scale_bar(figure, diff, [.802, .055, .158, .012], [-.1, 0, .1], ["−0.10", "0", "+0.10"], extend="both")
+    bar.set_label("Δ error (scene units)", labelpad=2, fontsize=7)
+    save(figure, directory / "fig5_ray_depth_views", audit)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("figures"))
@@ -298,6 +398,8 @@ def main():
     method_figure(args.output, provenance, audit)
     case_figure(args.output, source_data, provenance, audit)
     ablation_figure(args.output, args.evidence, source_data, audit)
+    ray_metrics_figure(args.output, args.evidence, source_data, audit)
+    ray_case_figure(args.output, source_data, audit)
 
 
 if __name__ == "__main__":
