@@ -1,46 +1,78 @@
-# 论文配图与图注
+# 3DGS 深度筛查与修正
 
-三张图按双栏通栏宽度（约 182 mm）排版。PDF 和 SVG 保留可编辑文本，PNG 与 TIFF 为 600 dpi。图中使用英文短标签，中文图注如下。
+已经训练好的 3DGS 模型可以渲染出深度。问题出在遮挡边缘：如果一个像素同时收到近处椅腿和远处墙面的贡献，平均深度就可能落在空中。这个项目先检查哪些像素的深度可疑，再用邻近视角判断一部分像素应该选前层还是后层。
 
-## 图 1 射线分层与多视角核对
+**输入**是预训练 3DGS 模型、相机参数和配套 RGB。**输出**是深度风险图、修正点云和误差表。整个处理流程用 CPU，参考深度用来核对坐标和评估。
 
-[PDF](../figures/fig1_method.pdf) · [PNG](../figures/fig1_method.png)
+![中心深度与逐射线深度在三个物体上的配对误差变化](figures/fig4_ray_depth_metrics.png)
 
-**图注**　固定 3DGS 模型的多视角深度修正。**a**，沿相机射线按深度排列高斯贡献。当前后两侧各有至少 10% 的累计合成权重且间隙达到阈值时，分别用两侧的加权中值提出候选。曲线和均值位置为示意。**b**，将候选深度对应的三维点及局部图像块重投影到邻近视角，分别核对深度一致性和光度代价是否下降。**c**，警示牌视角 120 中近层候选的实际投票记录。实心圆表示通过该行的检查。视角 107 和 128 同时提供两种支持，可靠视角中没有自由空间冲突，因此规则采纳了近层候选。图 2b 展示这次修改的误差。
+## 结果图
 
-[修正规则和阈值](REFINEMENT_PROTOCOL.md) · [示例像素和投票来源](../figures/source_data/case_provenance.json)
+| 图 | 说明 |
+| --- | --- |
+| [图 1 射线分层与多视角核对](figures/fig1_method.pdf) | 深度候选怎么提出，四个邻近视角如何投票 |
+| [图 2 深度图对照](figures/fig2_comparison.pdf) | 在完整 RGB 上框选局部，并排看参考深度、修正前后和误差变化 |
+| [图 3 消融实验](figures/fig3_ablation.pdf) | 椅子和警示牌各 8 个视角，比较几何、RGB 和联合规则 |
+| [图 4 逐射线深度定量结果](figures/fig4_ray_depth_metrics.pdf) | 24 个视角的配对 MAE 变化和大误差像素比例 |
+| [图 5 逐射线深度局部对照](figures/fig5_ray_depth_views.pdf) | 椅子和电钻的改善实例，以及警示牌的退化实例 |
 
-## 图 2 深度图的定性对照
+[中文图注和图的来源](docs/FIGURES.md) · [实验报告](docs/REFINEMENT_REPORT.md) · [实验协议](docs/REFINEMENT_PROTOCOL.md)
 
-[PDF](../figures/fig2_comparison.pdf) · [PNG](../figures/fig2_comparison.png)
+## 仓库目录
 
-**图注**　联合规则的一个修正实例和一个误修实例。每行从左到右依次为带定位框的完整 RGB 图、同位置的参考深度、加权中值深度、联合修正深度和绝对误差变化。黄色框对应后四列的 29 × 29 像素裁剪，白框中心是读数像素。每行前三张深度图共用该行下方的深度色标。右列显示修正后减去修正前的绝对误差，两行共用 ±1.2 个场景单位的发散色标。蓝色表示误差下降，红色表示上升，灰色为评估掩码以外的像素。**a**，椅子视角 12，标记点的绝对误差从 0.468 降至 0.017。**b**，警示牌视角 120，绝对误差从 0.047 升至 1.196。
+| 位置 | 放什么 |
+| --- | --- |
+| `gsdepth/core/` | 3DGS 投影、深度合成、跨视角核对 |
+| `gsdepth/benchmarks/` | 合成实验、公开模型实验、误差统计 |
+| `gsdepth/tools/` | 下载公开数据、复查示例像素、画图 |
+| `tests/` | 深度分层、坐标变换和决策规则测试 |
+| `figures/` | 论文图。`source_data/` 放绘图数据与示例的来源记录 |
+| `evidence/` | 已运行的结果，包括逐视角 CSV、阈值和数据指纹 |
+| `docs/` | 报告、实验协议与图注 |
 
-两行均取自 128 × 128 的评估视角，局部按原像素放大。椅子选取视角 12 中跨过误差阈值且降幅最大的像素，警示牌沿用实验日志记录的误修。两处用于说明算法行为，全部保留视角的结果见图 3。[视角、坐标与精确读数](../figures/source_data/case_provenance.json) · [DX.GL 数据集](https://huggingface.co/datasets/dxgl/multiview-datasets)
+下载的模型和重跑时生成的结果分别在 `data/` 和 `results/`，Git 会忽略这两个目录。
 
-## 图 3 消融实验
+## 怎么跑
 
-[PDF](../figures/fig3_ablation.pdf) · [PNG](../figures/fig3_ablation.png) · [绘图 CSV](../figures/source_data/fig3_paired_view_metrics.csv)
-
-**图注**　三个邻近视角规则在保留视角上的对照。**a、b**，每个点表示一个视角中该规则的 MAE 减去加权中值的 MAE，单位为 0.001 个场景单位。菱形表示同一物体 8 个视角的等权平均，负值表示误差下降。**c**，合计两个物体的 16 个视角，以 0.05 个场景单位为阈值统计相对于加权中值从大误差变为合格的像素数（右），以及从合格变为大误差的像素数（左）。各方法在同一批有效像素上评估。视角来自两个物体，结果用于描述本实验的差异。
-
-[椅子逐视角日志](../evidence/chair_heldout/metrics.csv) · [警示牌逐视角日志](../evidence/sign_heldout/metrics.csv)
-
-## 排版参考
-
-定性图采用完整视图定位、同位置放大和按方法对齐的列布局，参考 DNGaussian 图 4、5 的框选与放大方式，以及 2DGS 图 5 的逐场景对比方式。[DNGaussian，CVPR 2024](https://openaccess.thecvf.com/content/CVPR2024/papers/Li_DNGaussian_Optimizing_Sparse-View_3D_Gaussian_Radiance_Fields_with_Global-Local_Depth_CVPR_2024_paper.pdf) · [2D Gaussian Splatting，SIGGRAPH 2024](https://www.cvlibs.net/publications/Huang2024SIGGRAPH.pdf)
-
-## 重画与复核
-
-用仓库中的证据和裁剪数组离线重画。
-
-~~~powershell
-python -m gsdepth.tools.plot_paper
-~~~
-
-如需重新生成图 1c 的投票记录和图 2 的像素数组，先按 README 下载两个对象，再运行以下命令。重放脚本核对源文件的 SHA-256，并对照已保存的逐视角实验记录检查示例重放的结果。
+在仓库根目录运行。下面以 Windows PowerShell 为例，使用 Python 3.11 或更新版本。
 
 ~~~powershell
-python -m gsdepth.tools.prepare_paper_cases
-python -m gsdepth.tools.plot_paper
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m unittest discover -s tests
 ~~~
+
+只想重画论文图，直接用仓库自带的证据和绘图数据：
+
+~~~powershell
+.\.venv\Scripts\python -m gsdepth.tools.plot_paper
+~~~
+
+合成场景可以离线跑：
+
+~~~powershell
+.\.venv\Scripts\python -m gsdepth.benchmarks.experiment synthetic
+.\.venv\Scripts\python -m gsdepth.tools.plot_results results/synthetic
+~~~
+
+下载两组公开数据，再跑椅子的单视角筛查和两个物体的多视角修正：
+
+~~~powershell
+.\.venv\Scripts\python -m gsdepth.tools.fetch_chair --object chair
+.\.venv\Scripts\python -m gsdepth.tools.fetch_chair --object sign
+.\.venv\Scripts\python -m gsdepth.benchmarks.experiment chair
+.\.venv\Scripts\python -m gsdepth.benchmarks.run_refinement --object chair
+.\.venv\Scripts\python -m gsdepth.benchmarks.run_refinement --object sign
+~~~
+
+## 这次实验看到了什么
+
+几何单项在两个物体上总体误差最低。以 0.05 个场景单位为大误差阈值，对照加权中值，几何版合计修好 93 个点、改坏 18 个点，联合版修好 25 个点、改坏 2 个点。图 2 展示一次修对和一次误修，图 3 汇总两个物体的结果。完整分组和逐视角结果见[实验报告](docs/REFINEMENT_REPORT.md)。
+
+后续实验把射线两侧的最低合成权重从 10% 降到 5%。在原有两个评估组上，几何版修好 102 个点、改坏 20 个点。用 `--layer-mass 0.05` 可以复跑这项对照。[后续实验和逐视角记录](docs/REFINEMENT_FOLLOWUP.md)
+
+用 `--weak-layer-check` 可在一次运行中比较原版 10%、统一 5% 和弱候选三票规则。三票规则先保留原版已加的修正，再核对新增候选。椅子、警示牌和新加入的电钻结果见[三票对照](docs/REFINEMENT_FOLLOWUP.md#弱候选三票规则)。
+
+`--ray-depth` 用每个像素射线上高斯响应最大的点计算深度。在椅子、警示牌和电钻上，逐射线深度配合 5% 几何规则将 MAE 分别降低 5.0%、2.8% 和 10.7%，对照为按高斯中心深度计算的 5% 几何版。[逐射线实验](docs/REFINEMENT_FOLLOWUP.md#逐射线高斯深度)
+
+[公开 3DGS 数据与来源](https://huggingface.co/datasets/dxgl/multiview-datasets)
