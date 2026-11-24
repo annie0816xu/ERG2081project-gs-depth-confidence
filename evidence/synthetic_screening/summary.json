@@ -1,0 +1,79 @@
+{
+  "kind": "Synthetic occlusion benchmark",
+  "units": "m",
+  "bad_threshold": 0.1,
+  "width": 160,
+  "height": 120,
+  "cases": [
+    {
+      "name": "canonical",
+      "near_z": 2.0,
+      "far_z": 5.0,
+      "half_width": 0.145,
+      "near_opacity": 0.45,
+      "angle": 0
+    },
+    {
+      "name": "short_gap",
+      "near_z": 2.0,
+      "far_z": 2.7,
+      "half_width": 0.145,
+      "near_opacity": 0.5,
+      "angle": 10
+    },
+    {
+      "name": "wide_gap",
+      "near_z": 1.8,
+      "far_z": 5.7,
+      "half_width": 0.15,
+      "near_opacity": 0.55,
+      "angle": -12
+    },
+    {
+      "name": "thin_strip",
+      "near_z": 2.0,
+      "far_z": 5.0,
+      "half_width": 0.038,
+      "near_opacity": 0.55,
+      "angle": 13
+    },
+    {
+      "name": "weak_foreground",
+      "near_z": 2.1,
+      "far_z": 5.1,
+      "half_width": 0.09,
+      "near_opacity": 0.12,
+      "angle": -11
+    },
+    {
+      "name": "strong_foreground",
+      "near_z": 2.0,
+      "far_z": 4.7,
+      "half_width": 0.16,
+      "near_opacity": 0.75,
+      "angle": 18
+    }
+  ],
+  "macro_average_at_90_percent": {
+    "opacity": {
+      "mae": 0.10610970051863104,
+      "bad_fraction": 0.12969714506172839,
+      "correct_edge_retention": 0.8737864077669903
+    },
+    "gradient": {
+      "mae": 0.02764245846377789,
+      "bad_fraction": 0.048003472222222225,
+      "correct_edge_retention": 0.0
+    },
+    "std": {
+      "mae": 0.016698150276790582,
+      "bad_fraction": 0.03004436728395062,
+      "correct_edge_retention": 0.5
+    },
+    "spread": {
+      "mae": 0.026487103988833038,
+      "bad_fraction": 0.044309413580246905,
+      "correct_edge_retention": 0.9432827151273753
+    }
+  }
+}

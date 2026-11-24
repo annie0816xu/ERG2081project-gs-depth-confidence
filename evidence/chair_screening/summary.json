@@ -1,0 +1,79 @@
+{
+  "kind": "DX.GL Modern Arm Chair pretrained Splatfacto benchmark",
+  "units": "scene units",
+  "bad_threshold": 0.05,
+  "width": 160,
+  "height": 160,
+  "gaussians": 49817,
+  "depth_definition": "camera z",
+  "reference_views": [
+    14,
+    36,
+    58,
+    80,
+    102,
+    124,
+    146,
+    168
+  ],
+  "example_view": 14,
+  "calibration_views": [
+    29,
+    94,
+    157
+  ],
+  "calibration_ious": {
+    "original": [
+      0.05066141289051506,
+      0.030907095830285298,
+      0.0020380434782608695
+    ],
+    "nerfstudio_default": [
+      0.9324235664610944,
+      0.9001766784452296,
+      0.9056870363829036
+    ]
+  },
+  "reference_point_cloud_checks": {
+    "29": {
+      "overlap_pixels": 7106,
+      "median_camera_z_error": 0.003627126868114061,
+      "median_along_ray_error": 0.05652637526939874
+    },
+    "94": {
+      "overlap_pixels": 5095,
+      "median_camera_z_error": 0.004300053165012585,
+      "median_along_ray_error": 0.04681694936320957
+    },
+    "157": {
+      "overlap_pixels": 5128,
+      "median_camera_z_error": 0.003608484835955883,
+      "median_along_ray_error": 0.03774907426337948
+    }
+  },
+  "pose_normalization": "nerfstudio_default",
+  "pose_scale": 0.2500542502608544,
+  "source": "https://dx.gl/datasets/KLBJAuie9JaB",
+  "macro_average_at_90_percent": {
+    "opacity": {
+      "mae": 0.04258460044273961,
+      "bad_fraction": 0.16156288707135805,
+      "correct_edge_retention": 0.8098591134953819
+    },
+    "gradient": {
+      "mae": 0.02884463035843524,
+      "bad_fraction": 0.1121500462639978,
+      "correct_edge_retention": 0.8967663651839904
+    },
+    "std": {
+      "mae": 0.030074841980533642,
+      "bad_fraction": 0.10593995212419523,
+      "correct_edge_retention": 0.9352217207973439
+    },
+    "spread": {
+      "mae": 0.031815433469348495,
+      "bad_fraction": 0.10608505946783933,
+      "correct_edge_retention": 0.9416924994971763
+    }
+  }
+}
