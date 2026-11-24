@@ -1,0 +1,94 @@
+{
+  "selection": "Largest absolute error reduction among fixed chair pixels in view 12; documented sign false edit in view 120.",
+  "error_threshold_scene_units": 0.05,
+  "chair_fixed": {
+    "dataset": "chair",
+    "view": 12,
+    "neighbor_views": [
+      20,
+      4,
+      25,
+      7
+    ],
+    "pixel_xy": [
+      85,
+      58
+    ],
+    "crop_xywh": [
+      71,
+      44,
+      29,
+      29
+    ],
+    "source": "https://dx.gl/datasets/KLBJAuie9JaB",
+    "reference_depth": 4.05152054333887,
+    "median_depth": 3.583863438429671,
+    "joint_depth": 4.068387749014136,
+    "median_abs_error": 0.4676571049091991,
+    "joint_abs_error": 0.016867205675265673,
+    "selected_candidate": "back",
+    "geometry_states": [
+      0,
+      1,
+      2,
+      1
+    ],
+    "photo_pass": [
+      true,
+      true,
+      false,
+      true
+    ],
+    "joint_pass": [
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "sign_false_edit": {
+    "dataset": "sign",
+    "view": 120,
+    "neighbor_views": [
+      133,
+      107,
+      141,
+      128
+    ],
+    "pixel_xy": [
+      64,
+      64
+    ],
+    "crop_xywh": [
+      50,
+      50,
+      29,
+      29
+    ],
+    "source": "https://dx.gl/datasets/tHdRul1GzzoU",
+    "reference_depth": 4.5227019297476305,
+    "median_depth": 4.475867711842614,
+    "joint_depth": 3.3268999264444084,
+    "median_abs_error": 0.046834217905016295,
+    "joint_abs_error": 1.1958020033032222,
+    "selected_candidate": "front",
+    "geometry_states": [
+      1,
+      1,
+      0,
+      1
+    ],
+    "photo_pass": [
+      false,
+      true,
+      false,
+      true
+    ],
+    "joint_pass": [
+      false,
+      true,
+      false,
+      true
+    ]
+  }
+}

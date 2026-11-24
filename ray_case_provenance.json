@@ -1,0 +1,85 @@
+{
+  "view_selection": "Smallest paired MAE change for chair and drill; largest for warning sign.",
+  "crop_selection": "Largest directional sum of per-pixel error changes in any 29x29 window.",
+  "method": "geometry_mass05",
+  "examples": [
+    {
+      "dataset": "chair",
+      "view": 177,
+      "valid": 4304,
+      "center_mae": 0.023810477096707517,
+      "ray_mae": 0.01779434148477393,
+      "delta_mae": -0.006016135611933586,
+      "center_bad": 275,
+      "ray_bad": 240,
+      "source": "https://dx.gl/datasets/KLBJAuie9JaB",
+      "neighbor_views": [
+        185,
+        164,
+        169,
+        190
+      ],
+      "crop_xywh": [
+        54,
+        26,
+        29,
+        29
+      ],
+      "crop_valid": 809,
+      "crop_center_mae": 0.05662793558583778,
+      "crop_ray_mae": 0.047520046606517576
+    },
+    {
+      "dataset": "drill",
+      "view": 75,
+      "valid": 2843,
+      "center_mae": 0.01995248477243337,
+      "ray_mae": 0.015302259469246095,
+      "delta_mae": -0.004650225303187275,
+      "center_bad": 229,
+      "ray_bad": 214,
+      "source": "https://dx.gl/datasets/A0dcsk7HHgAg",
+      "neighbor_views": [
+        62,
+        88,
+        96,
+        54
+      ],
+      "crop_xywh": [
+        57,
+        24,
+        29,
+        29
+      ],
+      "crop_valid": 590,
+      "crop_center_mae": 0.029631633375379676,
+      "crop_ray_mae": 0.018468554828260663
+    },
+    {
+      "dataset": "sign",
+      "view": 34,
+      "valid": 3962,
+      "center_mae": 0.008160454366254705,
+      "ray_mae": 0.010843183638703983,
+      "delta_mae": 0.0026827292724492784,
+      "center_bad": 64,
+      "ray_bad": 66,
+      "source": "https://dx.gl/datasets/tHdRul1GzzoU",
+      "neighbor_views": [
+        47,
+        21,
+        26,
+        42
+      ],
+      "crop_xywh": [
+        51,
+        55,
+        29,
+        29
+      ],
+      "crop_valid": 841,
+      "crop_center_mae": 0.004757546074428705,
+      "crop_ray_mae": 0.008422688746955436
+    }
+  ]
+}
