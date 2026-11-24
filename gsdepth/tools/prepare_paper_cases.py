@@ -16,7 +16,7 @@ from gsdepth.core.depth_refinement import Rules, ViewEvidence, refine
 from gsdepth.core.renderer import load_gaussian_ply, render
 
 
-def replay(dataset, view, data, evidence):
+def replay(dataset, view, data, evidence, metric="joint"):
     root = data / dataset
     logs = evidence / f"{dataset}_heldout"
     recorded = json.loads((logs / "summary.json").read_text(encoding="utf-8"))
@@ -28,6 +28,9 @@ def replay(dataset, view, data, evidence):
     size = recorded["size"]
     neighbors = recorded["neighbors"][str(view)]
     rules = Rules(**recorded["rules"])
+    method = "geometry" if metric == "geometry_mass05" else metric
+    mass = recorded["weak_layer_check"]["relaxed_mass"] if metric == "geometry_mass05" else 0.10
+    ray_depth = "fragment_depth" in recorded
     with ZipFile(root / "reference.zip") as archive:
         metadata = json.loads(archive.read("transforms.json"))
         poses = np.array([item["transform_matrix"] for item in metadata["frames"]])
@@ -42,7 +45,8 @@ def replay(dataset, view, data, evidence):
 
         def build(index):
             camera = camera_at(poses[index], intrinsics, size)
-            frame = render(gaussians, camera, rules.minimum_layer_gap)
+            frame = render(gaussians, camera, rules.minimum_layer_gap,
+                           minimum_layer_mass=mass, ray_depth=ray_depth)
             return ViewEvidence(camera, frame, load_luminance(archive, metadata, index, size))
 
         anchor = build(view)
@@ -50,20 +54,20 @@ def replay(dataset, view, data, evidence):
         truth = read_truth(archive, metadata, view, size)
         rgb = read_image(archive, metadata["frames"][view]["file_path"], size, Image.Resampling.BILINEAR)
     rows, valid = evaluate(depths, anchor.frame, candidates, decisions, truth, scale, view, rules)
-    current = next(row for row in rows if row["threshold"] == 0.05 and row["method"] == "joint")
+    current = next(row for row in rows if row["threshold"] == 0.05 and row["method"] == method)
     with (logs / "metrics.csv").open(encoding="utf-8", newline="") as stream:
         previous = next(
             row for row in csv.DictReader(stream)
-            if row["view"] == str(view) and row["threshold"] == "0.05" and row["method"] == "joint"
+            if row["view"] == str(view) and row["threshold"] == "0.05" and row["method"] == metric
         )
     for key in ("valid", "edits", "fixed", "broken", "bad"):
         if current[key] != int(previous[key]):
             raise ValueError(f"Replayed {dataset} view {view} differs from the recorded view for {key}")
     np.testing.assert_allclose(current["mae"], float(previous["mae"]), atol=1e-12, rtol=0)
     return {
-        "rgb": rgb[..., :3], "truth": truth, "valid": valid, "edited": decisions["joint"] > 0,
-        "median": depths["median"] / scale, "joint": depths["joint"] / scale,
-    }, recorded["source"], neighbors, trace, decisions["joint"], rules
+        "rgb": rgb[..., :3], "truth": truth, "valid": valid, "edited": decisions[method] > 0,
+        "median": depths["median"] / scale, method: depths[method] / scale,
+    }, recorded["source"], neighbors, trace, decisions[method], rules
 
 
 def write_case(output, name, dataset, view, arrays, pixel_xy, source, neighbors, trace, choice, rules):
