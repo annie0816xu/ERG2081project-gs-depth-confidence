@@ -1,0 +1,66 @@
+{
+  "dataset": "chair",
+  "views": [
+    12,
+    34,
+    55,
+    75,
+    99,
+    120,
+    143,
+    177
+  ],
+  "size": 128,
+  "depth": "Center-depth expected value, matching the original risk scoring stage",
+  "threshold": 0.05,
+  "source_sha256": {
+    "scene.ply": "6fb0792c208cb622dc4a0cd542fc7b19bc242da9ac9f866303d209285e444288",
+    "reference.zip": "7d22e2b4982c1448b5fa8cb09d618818b8740d9c069316acf7ed932ffc2ecf2e"
+  },
+  "intervals": {
+    "spread": [
+      0.1,
+      0.9
+    ],
+    "spread_05_95": [
+      0.05,
+      0.95
+    ],
+    "spread_15_85": [
+      0.15,
+      0.85
+    ]
+  },
+  "macro_average_at_90_percent": {
+    "opacity": {
+      "mae": 0.04800606435294322,
+      "bad_fraction": 0.22214868290142203,
+      "correct_edge_retention": 0.8209726694495542
+    },
+    "gradient": {
+      "mae": 0.03151763764707956,
+      "bad_fraction": 0.16176849798263482,
+      "correct_edge_retention": 0.9309262907730701
+    },
+    "std": {
+      "mae": 0.03382210088437537,
+      "bad_fraction": 0.1609238635646835,
+      "correct_edge_retention": 0.945987863313643
+    },
+    "spread": {
+      "mae": 0.036734161165131,
+      "bad_fraction": 0.163289307614077,
+      "correct_edge_retention": 0.9444732897764653
+    },
+    "spread_05_95": {
+      "mae": 0.035851411314361,
+      "bad_fraction": 0.16322091162016833,
+      "correct_edge_retention": 0.9462546969849353
+    },
+    "spread_15_85": {
+      "mae": 0.03766296912952316,
+      "bad_fraction": 0.1638427799478766,
+      "correct_edge_retention": 0.9469290496078269
+    }
+  }
+}

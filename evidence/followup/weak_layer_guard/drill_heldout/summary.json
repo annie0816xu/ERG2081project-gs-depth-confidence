@@ -1,0 +1,309 @@
+{
+  "dataset": "drill",
+  "source": "https://dx.gl/datasets/A0dcsk7HHgAg",
+  "split": "heldout",
+  "size": 128,
+  "views": [
+    12,
+    34,
+    55,
+    75,
+    99,
+    120,
+    143,
+    177
+  ],
+  "example_view": 12,
+  "neighbors": {
+    "12": [
+      20,
+      4,
+      25,
+      7
+    ],
+    "34": [
+      47,
+      21,
+      26,
+      42
+    ],
+    "55": [
+      42,
+      68,
+      76,
+      47
+    ],
+    "75": [
+      62,
+      88,
+      96,
+      54
+    ],
+    "99": [
+      112,
+      86,
+      78,
+      107
+    ],
+    "120": [
+      133,
+      107,
+      141,
+      128
+    ],
+    "143": [
+      156,
+      130,
+      122,
+      164
+    ],
+    "177": [
+      185,
+      164,
+      169,
+      190
+    ]
+  },
+  "rules": {
+    "minimum_layer_gap": 0.012,
+    "target_opacity": 0.35,
+    "neighbor_opacity": 0.5,
+    "maximum_neighbor_spread": 0.045,
+    "geometry_tolerance": 0.012,
+    "minimum_texture": 0.02,
+    "maximum_photo_cost": 0.25,
+    "minimum_photo_gain": 0.06,
+    "minimum_depth_change": 0.006,
+    "minimum_views": 2
+  },
+  "gaussians": 37947,
+  "normalization": "nerfstudio_default",
+  "model_scale": 0.2500555659531695,
+  "calibration_ious": {
+    "original": [
+      0.018841094916459297,
+      0.033322952351292436,
+      0.021220159151193633
+    ],
+    "nerfstudio_default": [
+      0.8885897004375631,
+      0.9020527859237537,
+      0.8892834086507424
+    ]
+  },
+  "depth_convention_checks": {
+    "29": {
+      "overlap_pixels": 2640,
+      "median_camera_z_error": 0.005138119473693914,
+      "median_along_ray_error": 0.05033366199979761
+    },
+    "94": {
+      "overlap_pixels": 3076,
+      "median_camera_z_error": 0.0030896864980356487,
+      "median_along_ray_error": 0.07897985079908887
+    },
+    "157": {
+      "overlap_pixels": 2755,
+      "median_camera_z_error": 0.004394526486972694,
+      "median_along_ray_error": 0.06588923293987126
+    }
+  },
+  "source_sha256": {
+    "scene.ply": "51b2a8c72db200a3c9902838983bf8a3d90f341059a0a0d88398f1a858975ad4",
+    "reference.zip": "8cfd9d085079c90d907338b80e76ea184fc641d391ca6a3ac1bff07490b15926"
+  },
+  "by_error_threshold": {
+    "0.025": {
+      "valid": 21873,
+      "eligible_targets": 376,
+      "median_bad": 4856,
+      "recoverable": 94,
+      "oracle_bad": 4762,
+      "mean": {
+        "macro_mae": 0.022280131869535858,
+        "macro_bad_fraction": 0.2583713843748848,
+        "bad": 5536
+      },
+      "median": {
+        "macro_mae": 0.020734328738441096,
+        "macro_bad_fraction": 0.2268043590447399,
+        "bad": 4856
+      },
+      "geometry": {
+        "macro_mae": 0.02068365652961207,
+        "macro_bad_fraction": 0.22660326290899055,
+        "bad": 4852,
+        "edits": 30,
+        "fixed": 10,
+        "broken": 6,
+        "net_fixed": 4
+      },
+      "photo": {
+        "macro_mae": 0.020623776421775618,
+        "macro_bad_fraction": 0.22635537226540467,
+        "bad": 4846,
+        "edits": 27,
+        "fixed": 14,
+        "broken": 4,
+        "net_fixed": 10
+      },
+      "joint": {
+        "macro_mae": 0.020729557827448754,
+        "macro_bad_fraction": 0.22679761708327378,
+        "bad": 4856,
+        "edits": 4,
+        "fixed": 1,
+        "broken": 1,
+        "net_fixed": 0
+      },
+      "geometry_mass05": {
+        "macro_mae": 0.02065556740421897,
+        "macro_bad_fraction": 0.22655557118827327,
+        "bad": 4851,
+        "edits": 32,
+        "fixed": 11,
+        "broken": 6,
+        "net_fixed": 5
+      },
+      "geometry_weak_guard": {
+        "macro_mae": 0.02068365652961207,
+        "macro_bad_fraction": 0.22660326290899055,
+        "bad": 4852,
+        "edits": 30,
+        "fixed": 10,
+        "broken": 6,
+        "net_fixed": 4
+      }
+    },
+    "0.05": {
+      "valid": 21873,
+      "eligible_targets": 376,
+      "median_bad": 2152,
+      "recoverable": 112,
+      "oracle_bad": 2040,
+      "mean": {
+        "macro_mae": 0.022280131869535858,
+        "macro_bad_fraction": 0.10701575882771966,
+        "bad": 2285
+      },
+      "median": {
+        "macro_mae": 0.020734328738441096,
+        "macro_bad_fraction": 0.10078125527400243,
+        "bad": 2152
+      },
+      "geometry": {
+        "macro_mae": 0.02068365652961207,
+        "macro_bad_fraction": 0.10033120327542118,
+        "bad": 2143,
+        "edits": 30,
+        "fixed": 15,
+        "broken": 6,
+        "net_fixed": 9
+      },
+      "photo": {
+        "macro_mae": 0.020623776421775618,
+        "macro_bad_fraction": 0.1002883008548501,
+        "bad": 2141,
+        "edits": 27,
+        "fixed": 16,
+        "broken": 5,
+        "net_fixed": 11
+      },
+      "joint": {
+        "macro_mae": 0.020729557827448754,
+        "macro_bad_fraction": 0.10077451331253634,
+        "bad": 2152,
+        "edits": 4,
+        "fixed": 1,
+        "broken": 1,
+        "net_fixed": 0
+      },
+      "geometry_mass05": {
+        "macro_mae": 0.02065556740421897,
+        "macro_bad_fraction": 0.10023396736128336,
+        "bad": 2141,
+        "edits": 32,
+        "fixed": 17,
+        "broken": 6,
+        "net_fixed": 11
+      },
+      "geometry_weak_guard": {
+        "macro_mae": 0.02068365652961207,
+        "macro_bad_fraction": 0.10033120327542118,
+        "bad": 2143,
+        "edits": 30,
+        "fixed": 15,
+        "broken": 6,
+        "net_fixed": 9
+      }
+    },
+    "0.1": {
+      "valid": 21873,
+      "eligible_targets": 376,
+      "median_bad": 697,
+      "recoverable": 110,
+      "oracle_bad": 587,
+      "mean": {
+        "macro_mae": 0.022280131869535858,
+        "macro_bad_fraction": 0.03306503332279806,
+        "bad": 702
+      },
+      "median": {
+        "macro_mae": 0.020734328738441096,
+        "macro_bad_fraction": 0.032626891132305574,
+        "bad": 697
+      },
+      "geometry": {
+        "macro_mae": 0.02068365652961207,
+        "macro_bad_fraction": 0.032589896526570766,
+        "bad": 697,
+        "edits": 30,
+        "fixed": 12,
+        "broken": 12,
+        "net_fixed": 0
+      },
+      "photo": {
+        "macro_mae": 0.020623776421775618,
+        "macro_bad_fraction": 0.03208702606041531,
+        "bad": 685,
+        "edits": 27,
+        "fixed": 16,
+        "broken": 4,
+        "net_fixed": 12
+      },
+      "joint": {
+        "macro_mae": 0.020729557827448754,
+        "macro_bad_fraction": 0.03262329112234667,
+        "bad": 697,
+        "edits": 4,
+        "fixed": 1,
+        "broken": 1,
+        "net_fixed": 0
+      },
+      "geometry_mass05": {
+        "macro_mae": 0.02065556740421897,
+        "macro_bad_fraction": 0.03249266061243296,
+        "bad": 695,
+        "edits": 32,
+        "fixed": 14,
+        "broken": 12,
+        "net_fixed": 2
+      },
+      "geometry_weak_guard": {
+        "macro_mae": 0.02068365652961207,
+        "macro_bad_fraction": 0.032589896526570766,
+        "bad": 697,
+        "edits": 30,
+        "fixed": 12,
+        "broken": 12,
+        "net_fixed": 0
+      }
+    }
+  },
+  "weak_layer_check": {
+    "base_mass": 0.1,
+    "relaxed_mass": 0.05,
+    "minimum_views": 3,
+    "mode": "Keep baseline edits; consider only new weak depths, with at least three supporting views."
+  }
+}

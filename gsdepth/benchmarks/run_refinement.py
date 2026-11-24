@@ -12,7 +12,8 @@ from zipfile import ZipFile
 import numpy as np
 from PIL import Image
 
-from gsdepth.core.depth_refinement import Rules, ViewEvidence, refine
+from gsdepth.core.depth_refinement import Rules, ViewEvidence, refine, refine_weak_layers
+from gsdepth.core.depth_reprojection import refine_with_reprojection
 from gsdepth.benchmarks.experiment import write_ply
 from gsdepth.benchmarks.public_benchmark import CALIBRATION, VIEWS, calibrate, camera_at, check_depth_definition, read_image, read_truth
 from gsdepth.core.renderer import load_gaussian_ply, render
@@ -22,9 +23,11 @@ HELD_OUT = (12, 34, 55, 75, 99, 120, 143, 177)
 SOURCES = {
     "chair": "https://dx.gl/datasets/KLBJAuie9JaB",
     "sign": "https://dx.gl/datasets/tHdRul1GzzoU",
+    "drill": "https://dx.gl/datasets/A0dcsk7HHgAg",
 }
 ERROR_THRESHOLDS = (0.025, 0.05, 0.10)
-MODES = ("mean", "median", "geometry", "photo", "joint")
+WEAK_LAYER_MASS = 0.05
+WEAK_MINIMUM_VIEWS = 3
 
 
 def neighbor_indices(directions, index, held_out, count=4):
@@ -39,7 +42,7 @@ def load_luminance(archive, metadata, index, size):
     return (image[..., :3].astype(float) / 255) @ np.array([0.2126, 0.7152, 0.0722])
 
 
-def evaluate(depths, frame, target, choices, truth, scale, index, rules):
+def evaluate(depths, frame, target, choices, truth, scale, index, rules, reprojected=None):
     valid = np.isfinite(truth) & (truth > 0) & np.isfinite(depths["median"])
     if not valid.any():
         raise ValueError(f"View {index} has no valid overlapping depth pixels")
@@ -51,12 +54,17 @@ def evaluate(depths, frame, target, choices, truth, scale, index, rules):
     eligible = target[None] & (abs(candidates - frame["median"]) >= rules.minimum_depth_change)
     candidate_errors = np.abs(candidates[:, valid] / scale - truth[valid])
     oracle = np.minimum(errors["median"], np.where(eligible[:, valid], candidate_errors, np.inf).min(axis=0))
+    if reprojected is not None:
+        candidates = reprojected[:, valid]
+        eligible = np.isfinite(candidates) & (abs(candidates - frame["median"][valid]) >= rules.minimum_depth_change)
+        candidate_errors = np.abs(candidates / scale - truth[valid])
+        extended_oracle = np.minimum(oracle, np.where(eligible, candidate_errors, np.inf).min(axis=0))
 
     rows = []
     for threshold in ERROR_THRESHOLDS:
         bad_before = errors["median"] > threshold
         recoverable = bad_before & (oracle <= threshold)
-        for name in MODES:
+        for name in depths:
             err = errors[name]
             bad = err > threshold
             edited = choices[name][valid] > 0 if name in choices else None
@@ -74,6 +82,8 @@ def evaluate(depths, frame, target, choices, truth, scale, index, rules):
                 "median_bad": int(bad_before.sum()), "recoverable": int(recoverable.sum()),
                 "oracle_bad": int((oracle > threshold).sum()),
             })
+            if reprojected is not None:
+                rows[-1]["reproject_recoverable"] = int((bad_before & (extended_oracle <= threshold)).sum())
     return rows, valid
 
 
@@ -88,6 +98,10 @@ def export_example(directory, index, neighbors, anchor, depths, choices, target,
     )
     write_ply(directory / "median.ply", anchor.camera, depths["median"], anchor.frame["rgb"], valid)
     write_ply(directory / "joint.ply", anchor.camera, depths["joint"], anchor.frame["rgb"], valid)
+    if "geometry_weak_guard" in depths:
+        write_ply(directory / "geometry_weak_guard.ply", anchor.camera, depths["geometry_weak_guard"], anchor.frame["rgb"], valid)
+    if "reproject_consensus" in depths:
+        write_ply(directory / "reproject_consensus.ply", anchor.camera, depths["reproject_consensus"], anchor.frame["rgb"], valid)
 
 
 def summarize(rows):
@@ -102,21 +116,24 @@ def summarize(rows):
             "recoverable": sum(row["recoverable"] for row in median),
             "oracle_bad": sum(row["oracle_bad"] for row in median),
         }
-        for method in MODES:
+        if "reproject_recoverable" in median[0]:
+            threshold_summary["reproject_recoverable"] = sum(row["reproject_recoverable"] for row in median)
+        for method in dict.fromkeys(row["method"] for row in portion):
             scores = [row for row in portion if row["method"] == method]
             result = {
                 "macro_mae": float(np.mean([row["mae"] for row in scores])),
                 "macro_bad_fraction": float(np.mean([row["bad_fraction"] for row in scores])),
                 "bad": sum(row["bad"] for row in scores),
             }
-            if method in ("geometry", "photo", "joint"):
+            if scores[0]["edits"] is not None:
                 result.update({key: sum(row[key] for row in scores) for key in ("edits", "fixed", "broken", "net_fixed")})
             threshold_summary[method] = result
         summary[str(threshold)] = threshold_summary
     return summary
 
 
-def run(name, split, data, output, size=128):
+def run(name, split, data, output, size=128, reproject=False, minimum_layer_mass=0.10, weak_layer_check=False,
+        ray_depth=False, on_view=None):
     if name == "sign" and split != "heldout":
         raise ValueError("The sign dataset is reserved for held-out evaluation")
     root = data / name
@@ -140,7 +157,9 @@ def run(name, split, data, output, size=128):
         def get_view(index):
             if index not in cache:
                 camera = camera_at(poses[index], intrinsics, size)
-                frame = render(gaussians, camera, rules.minimum_layer_gap)
+                frame = render(gaussians, camera, rules.minimum_layer_gap, minimum_layer_mass=minimum_layer_mass,
+                               weak_layer_mass=WEAK_LAYER_MASS if weak_layer_check and index in views else None,
+                               ray_depth=ray_depth)
                 luminance = load_luminance(archive, metadata, index, size)
                 cache[index] = ViewEvidence(camera, frame, luminance)
             return cache[index]
@@ -151,17 +170,32 @@ def run(name, split, data, output, size=128):
             neighbors = neighbor_indices(direction, index, views)
             neighbor_log[index] = neighbors
             anchor = get_view(index)
-            depths, target, choices, trace = refine(anchor, [get_view(j) for j in neighbors], rules)
+            auxiliary = [get_view(j) for j in neighbors]
+            depths, target, choices, trace = refine(anchor, auxiliary, rules)
+            proposals = None
+            if weak_layer_check:
+                additions = refine_weak_layers(anchor, auxiliary, depths["geometry"], rules, WEAK_MINIMUM_VIEWS)
+                depths.update(additions)
+                choices.update({method: np.isfinite(depth) & (depth != depths["median"])
+                                for method, depth in additions.items()})
+            if reproject:
+                additions, proposals = refine_with_reprojection(anchor, auxiliary, depths["geometry"], rules)
+                depths.update(additions)
+                choices.update({method: np.isfinite(depth) & (depth != depths["median"])
+                                for method, depth in additions.items()})
             # The full selection is finished before the evaluation depth is loaded.
             truth = read_truth(archive, metadata, index, size)
-            view_rows, valid = evaluate(depths, anchor.frame, target, choices, truth, scale, index, rules)
+            view_rows, valid = evaluate(depths, anchor.frame, target, choices, truth, scale, index, rules, proposals)
             rows.extend(view_rows)
-            joint = next(row for row in view_rows if row["method"] == "joint" and row["threshold"] == 0.05)
-            if example_view is None and (joint["edits"] > 0 or index == views[-1]):
+            if on_view is not None:
+                on_view(index, depths, truth, valid, scale)
+            mode = "geometry_weak_guard" if weak_layer_check else "reproject_consensus" if reproject else "joint"
+            scored = next(row for row in view_rows if row["method"] == mode and row["threshold"] == 0.05)
+            if example_view is None and (scored["edits"] > 0 or index == views[-1]):
                 export_example(output, index, neighbors, anchor, depths, choices, target, trace, truth, valid, scale)
                 example_view = index
-            print(f"{name} {split} view {index:03}: {joint['edits']} edits, {joint['fixed']} fixed, "
-                  f"{joint['broken']} broken; {perf_counter()-start:.2f} s", flush=True)
+            print(f"{name} {split} view {index:03} {mode}: {scored['edits']} edits, {scored['fixed']} fixed, "
+                  f"{scored['broken']} broken; {perf_counter()-start:.2f} s", flush=True)
 
     with (output / "metrics.csv").open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=rows[0])
@@ -179,6 +213,21 @@ def run(name, split, data, output, size=128):
         "calibration_ious": alignment, "depth_convention_checks": depth_checks,
         "source_sha256": fingerprints, "by_error_threshold": summarize(rows),
     }
+    if reproject:
+        result["reprojection"] = {
+            "reproject": "Keep original geometric edits; check new depths with other views.",
+            "reproject_photo": "Also require at least one verifying view with improved patch match.",
+            "reproject_consensus": "Also allow small median-depth updates from at least three agreeing views.",
+        }
+    if minimum_layer_mass != 0.10:
+        result["minimum_layer_mass"] = minimum_layer_mass
+    if weak_layer_check:
+        result["weak_layer_check"] = {
+            "base_mass": minimum_layer_mass, "relaxed_mass": WEAK_LAYER_MASS, "minimum_views": WEAK_MINIMUM_VIEWS,
+            "mode": "Keep baseline edits; consider only new weak depths, with at least three supporting views.",
+        }
+    if ray_depth:
+        result["fragment_depth"] = "per-pixel ray Gaussian maximum, sorted per ray"
     (output / "summary.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
 
 
@@ -189,11 +238,28 @@ def main():
     parser.add_argument("--data", type=Path, default=Path("data"))
     parser.add_argument("--output", type=Path)
     parser.add_argument("--size", type=int, default=128)
+    parser.add_argument("--reproject", action="store_true", help="Evaluate additional depths from neighboring views")
+    parser.add_argument("--layer-mass", type=float, default=0.10, help="Minimum compositing weight on either side of the split")
+    parser.add_argument("--weak-layer-check", action="store_true", help="Compare uniform and three-view guarded weak splits")
+    parser.add_argument("--ray-depth", action="store_true", help="Sort fragments by their Gaussian maximum along each ray")
     args = parser.parse_args()
     if args.size < 3:
         parser.error("--size must be at least 3")
-    output = args.output or Path("results/refinement") / f"{args.object}_{args.split}"
-    run(args.object, args.split, args.data, output, args.size)
+    if not 0 < args.layer_mass < 0.5:
+        parser.error("--layer-mass must be between 0 and 0.5")
+    if args.weak_layer_check and args.layer_mass <= WEAK_LAYER_MASS:
+        parser.error("--weak-layer-check requires a baseline mass greater than 0.05")
+    suffix = "_reproject" if args.reproject else ""
+    if args.weak_layer_check:
+        suffix += "_weak_guard"
+    if args.ray_depth:
+        suffix += "_ray_depth"
+    if args.layer_mass != 0.10:
+        suffix += f"_mass{args.layer_mass:g}"
+    output = args.output or Path("results/refinement") / f"{args.object}_{args.split}{suffix}"
+    run(args.object, args.split, args.data, output, args.size,
+        reproject=args.reproject, minimum_layer_mass=args.layer_mass, weak_layer_check=args.weak_layer_check,
+        ray_depth=args.ray_depth)
 
 
 if __name__ == "__main__":

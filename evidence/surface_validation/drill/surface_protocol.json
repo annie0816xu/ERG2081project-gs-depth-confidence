@@ -1,0 +1,49 @@
+{
+  "dataset": "drill",
+  "source": "https://dx.gl/datasets/A0dcsk7HHgAg",
+  "source_sha256": {
+    "scene.ply": "51b2a8c72db200a3c9902838983bf8a3d90f341059a0a0d88398f1a858975ad4",
+    "reference.zip": "8cfd9d085079c90d907338b80e76ea184fc641d391ca6a3ac1bff07490b15926"
+  },
+  "views": [
+    12,
+    34,
+    55,
+    75,
+    99,
+    120,
+    143,
+    177
+  ],
+  "image_size": 128,
+  "original_image_size": 1024,
+  "reference_foreground_pixels": 21873,
+  "paired_valid_pixels": 21873,
+  "reference_points": 100156,
+  "visible_reference_points": 90885,
+  "visible_reference_points_by_view": {
+    "12": 32965,
+    "34": 36161,
+    "55": 36866,
+    "75": 36905,
+    "99": 30966,
+    "120": 32548,
+    "143": 37656,
+    "177": 31904
+  },
+  "visibility_tolerance_scene_units": 0.01,
+  "dense_reference_size": 256,
+  "dense_reference_points": 86482,
+  "dense_reference": "Back-projected source reference depths from the same views at 256x256 within the shared region",
+  "distance_thresholds_scene_units": [
+    0.025,
+    0.05,
+    0.1
+  ],
+  "depth_policy": "geometry_mass05",
+  "coordinate_system": "DX.GL dataset world, prediction camera Z divided by the recorded training scale",
+  "accuracy_reference": "Full supplied source point cloud",
+  "completeness_reference": "Supplied source points consistent with native reference depth and in the shared mask",
+  "alignment": "Fixed source cameras, no fitting to the reference point cloud",
+  "depth_replay": "Both viewwise CSVs match the archived depth experiments byte for byte"
+}

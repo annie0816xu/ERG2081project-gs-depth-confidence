@@ -90,6 +90,20 @@ def photo_cost(anchor_patches, other_patches, minimum_texture):
     return np.where(valid, (1 - np.clip(correlation, -1, 1))/2, np.nan)
 
 
+def choose_geometry_depths(candidates, geometry, rules, *, minimum_views=None, candidate_mask=None):
+    """Choose the best supported depth, falling back to the median candidate at index 0."""
+    minimum_views = rules.minimum_views if minimum_views is None else minimum_views
+    votes = (geometry == 1).sum(axis=0)
+    change = np.abs(candidates - candidates[:1])
+    allowed = (np.isfinite(candidates) & (change >= rules.minimum_depth_change)
+               & (votes >= minimum_views) & (votes > votes[:1]) & ~(geometry == -1).any(axis=0))
+    if candidate_mask is not None:
+        allowed &= candidate_mask
+    scores = np.where(allowed, votes, -1)
+    winner = np.lexsort((candidates, change, -scores), axis=0)[0]
+    return np.where(allowed[winner, np.arange(winner.size)], winner, 0)
+
+
 def choose_depths(candidates, geometry, costs, rules):
     """Return the selected candidate index for each of the three evidence rules."""
     support = geometry == 1
@@ -99,10 +113,10 @@ def choose_depths(candidates, geometry, costs, rules):
     change = np.abs(candidates - candidates[:1])
     eligible = np.isfinite(candidates) & (change >= rules.minimum_depth_change)
 
-    def select(evidence, base_condition, use_photo_gains):
+    def select(evidence, base_condition):
         votes = evidence.sum(axis=0)
         allowed = eligible & base_condition & (votes >= rules.minimum_views)
-        gains = np.where(evidence, gain, 0).sum(axis=0) / np.maximum(votes, 1) if use_photo_gains else np.zeros_like(change)
+        gains = np.where(evidence, gain, 0).sum(axis=0) / np.maximum(votes, 1)
         votes = np.where(allowed, votes, -1)
         order = np.lexsort((candidates, change, -gains, -votes), axis=0)
         winner = order[0]
@@ -110,23 +124,53 @@ def choose_depths(candidates, geometry, costs, rules):
         return np.where(best >= rules.minimum_views, winner, 0)
 
     return {
-        "geometry": select(support, ~contradiction & (support.sum(axis=0) > support.sum(axis=0)[:1]), False),
-        "photo": select(photo, True, True),
-        "joint": select(support & photo, ~contradiction, True),
+        "geometry": choose_geometry_depths(candidates, geometry, rules),
+        "photo": select(photo, True),
+        "joint": select(support & photo, ~contradiction),
     }
+
+
+def layered_targets(depths, opacity, layer_gap, rules):
+    target = (
+        np.isfinite(depths).all(axis=0)
+        & (opacity >= rules.target_opacity)
+        & (layer_gap >= rules.minimum_layer_gap)
+    )
+    # A complete anchor patch is required for a common target set in the ablations.
+    target[[0, -1], :] = False
+    target[:, [0, -1]] = False
+    return target
+
+
+def refine_weak_layers(anchor, neighbors, original_geometry, rules, minimum_views):
+    """Compare all weak splits with a guarded fallback after the original geometry pass."""
+    frame = anchor.frame
+    weak = frame["weak_layers"]
+    depths = np.stack((frame["median"], weak["front"], weak["back"]))
+    target = layered_targets(depths, frame["opacity"], weak["layer_gap"], rules)
+    rays = anchor.camera.rays()[target]
+    candidates = depths[:, target]
+    world = world_from_rays(anchor.camera, rays, candidates)
+    geometry = np.stack([geometry_state(world, neighbor, rules) for neighbor in neighbors])
+
+    uniform = choose_geometry_depths(candidates, geometry, rules)
+    uniform_depth = frame["median"].copy()
+    uniform_depth[target] = candidates[uniform, np.arange(uniform.size)]
+
+    new_only = ((candidates != frame["front"][target]) & (candidates != frame["back"][target])
+                & (original_geometry[target] == frame["median"][target]))
+    fallback = choose_geometry_depths(candidates, geometry, rules, minimum_views=minimum_views,
+                                     candidate_mask=new_only)
+    accepted = fallback > 0
+    guarded_depth = original_geometry.copy()
+    guarded_depth.flat[np.flatnonzero(target)[accepted]] = candidates[fallback[accepted], np.flatnonzero(accepted)]
+    return {"geometry_mass05": uniform_depth, "geometry_weak_guard": guarded_depth}
 
 
 def refine(anchor, neighbors, rules):
     frame, camera = anchor.frame, anchor.camera
     depths = np.stack((frame["median"], frame["front"], frame["back"]))
-    target = (
-        np.isfinite(depths).all(axis=0)
-        & (frame["opacity"] >= rules.target_opacity)
-        & (frame["layer_gap"] >= rules.minimum_layer_gap)
-    )
-    # A complete anchor patch is required for a common target set in the ablations.
-    target[[0, -1], :] = False
-    target[:, [0, -1]] = False
+    target = layered_targets(depths, frame["opacity"], frame["layer_gap"], rules)
     y, x = np.where(target)
     offsets = np.array([(dx, dy) for dy in (-1, 0, 1) for dx in (-1, 0, 1)])
     grid = np.column_stack((x, y))[:, None, :] + offsets

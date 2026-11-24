@@ -106,7 +106,7 @@ def adjacent_difference(depth, include_silhouette=False):
     return difference
 
 
-def score_frame(frame, truth, bad_threshold):
+def score_frame(frame, truth, bad_threshold, *, additional_scores=None):
     depth = frame["depth"]
     foreground = np.isfinite(truth) & (truth > 0)
     valid = foreground & np.isfinite(depth)
@@ -126,6 +126,8 @@ def score_frame(frame, truth, bad_threshold):
         "std": frame["std"],
         "spread": frame["spread"],
     }
+    if additional_scores is not None:
+        score_maps.update(additional_scores)
     tie = np.random.default_rng(20261124).permutation(errors.size)
     rows, retained = [], {}
     for method, score in score_maps.items():
@@ -154,6 +156,11 @@ def write_ply(path, camera, depth, rgb, mask):
     xyz_camera = camera.rays()[mask] * depth[mask, None]
     xyz_world = xyz_camera @ camera.camera_to_world[:3, :3].T + camera.camera_to_world[:3, 3]
     colors = np.rint(255*rgb[mask]).astype(np.uint8)
+    write_xyzrgb(path, xyz_world, colors)
+
+
+def write_xyzrgb(path, xyz_world, colors):
+    """Write world-space points and uint8 RGB as a PLY point cloud."""
     with path.open("w", encoding="ascii") as stream:
         stream.write(
             f"ply\nformat ascii 1.0\nelement vertex {len(xyz_world)}\n"
@@ -200,7 +207,7 @@ def save_results(output, rows, metadata):
         writer.writeheader()
         writer.writerows(rows)
     summary = {}
-    for method in METHODS:
+    for method in dict.fromkeys(row["method"] for row in rows):
         subset = [row for row in rows if row["target_coverage"] == 0.9 and row["method"] == method]
         summary[method] = {
             key: float(np.mean([row[key] for row in subset if row[key] is not None]))

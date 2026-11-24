@@ -10,6 +10,7 @@ import shutil
 SOURCES = {
     "chair": ("modern_arm_chair", "KLBJAuie9JaB"),
     "sign": ("wet_floor_sign", "tHdRul1GzzoU"),
+    "drill": ("drill", "A0dcsk7HHgAg"),
 }
 
 

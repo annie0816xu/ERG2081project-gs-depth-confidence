@@ -1,0 +1,66 @@
+{
+  "dataset": "sign",
+  "views": [
+    12,
+    34,
+    55,
+    75,
+    99,
+    120,
+    143,
+    177
+  ],
+  "size": 128,
+  "depth": "Center-depth expected value, matching the original risk scoring stage",
+  "threshold": 0.05,
+  "source_sha256": {
+    "scene.ply": "6e85eb2383746646d44b61d8ccc4746b838e76c1aa78c25d0988e0b5ac8b019f",
+    "reference.zip": "9405ec2abefafc7e9f9b1115a9cbf34f9683ed482314b14c7663ba328a11a785"
+  },
+  "intervals": {
+    "spread": [
+      0.1,
+      0.9
+    ],
+    "spread_05_95": [
+      0.05,
+      0.95
+    ],
+    "spread_15_85": [
+      0.15,
+      0.85
+    ]
+  },
+  "macro_average_at_90_percent": {
+    "opacity": {
+      "mae": 0.05252152404331036,
+      "bad_fraction": 0.11247809726095816,
+      "correct_edge_retention": 0.8123126938349945
+    },
+    "gradient": {
+      "mae": 0.036646633614417126,
+      "bad_fraction": 0.06891895999581714,
+      "correct_edge_retention": 0.8875052787482068
+    },
+    "std": {
+      "mae": 0.04066554937500136,
+      "bad_fraction": 0.07980999907785585,
+      "correct_edge_retention": 0.9220433371163128
+    },
+    "spread": {
+      "mae": 0.04472181760641373,
+      "bad_fraction": 0.08576084176024416,
+      "correct_edge_retention": 0.9236449882322677
+    },
+    "spread_05_95": {
+      "mae": 0.04443998007121923,
+      "bad_fraction": 0.0838407121188921,
+      "correct_edge_retention": 0.9179646881909231
+    },
+    "spread_15_85": {
+      "mae": 0.044999479241111154,
+      "bad_fraction": 0.08711864782551176,
+      "correct_edge_retention": 0.9308678249551721
+    }
+  }
+}

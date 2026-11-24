@@ -1,0 +1,49 @@
+{
+  "dataset": "chair",
+  "source": "https://dx.gl/datasets/KLBJAuie9JaB",
+  "source_sha256": {
+    "scene.ply": "6fb0792c208cb622dc4a0cd542fc7b19bc242da9ac9f866303d209285e444288",
+    "reference.zip": "7d22e2b4982c1448b5fa8cb09d618818b8740d9c069316acf7ed932ffc2ecf2e"
+  },
+  "views": [
+    12,
+    34,
+    55,
+    75,
+    99,
+    120,
+    143,
+    177
+  ],
+  "image_size": 128,
+  "original_image_size": 1024,
+  "reference_foreground_pixels": 30366,
+  "paired_valid_pixels": 30366,
+  "reference_points": 100156,
+  "visible_reference_points": 85205,
+  "visible_reference_points_by_view": {
+    "12": 26953,
+    "34": 34523,
+    "55": 33867,
+    "75": 34200,
+    "99": 26358,
+    "120": 29266,
+    "143": 36721,
+    "177": 38396
+  },
+  "visibility_tolerance_scene_units": 0.01,
+  "dense_reference_size": 256,
+  "dense_reference_points": 119740,
+  "dense_reference": "Back-projected source reference depths from the same views at 256x256 within the shared region",
+  "distance_thresholds_scene_units": [
+    0.025,
+    0.05,
+    0.1
+  ],
+  "depth_policy": "geometry_mass05",
+  "coordinate_system": "DX.GL dataset world, prediction camera Z divided by the recorded training scale",
+  "accuracy_reference": "Full supplied source point cloud",
+  "completeness_reference": "Supplied source points consistent with native reference depth and in the shared mask",
+  "alignment": "Fixed source cameras, no fitting to the reference point cloud",
+  "depth_replay": "Both viewwise CSVs match the archived depth experiments byte for byte"
+}

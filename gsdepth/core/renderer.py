@@ -96,7 +96,17 @@ def load_gaussian_ply(path: Path) -> Gaussians:
     return Gaussians(centers, covariances, opacities, colors)
 
 
-def projected_fragments(gaussians: Gaussians, camera: Camera):
+def ray_gaussian_depth(rays, centers, precision):
+    """Return the camera-Z depth of each Gaussian's maximum along a pixel ray."""
+    weighted_rays = np.einsum("...ij,...j->...i", precision, rays)
+    curvature = np.einsum("...i,...i->...", rays, weighted_rays)
+    numerator = np.einsum("...i,...i->...", centers, weighted_rays)
+    center_depth = centers[..., 2]
+    depth = np.divide(numerator, curvature, out=center_depth.copy(), where=curvature > 0)
+    return np.where(np.isfinite(depth) & (depth > 1e-4), depth, center_depth)
+
+
+def projected_fragments(gaussians: Gaussians, camera: Camera, *, ray_depth=False):
     """Return one fragment per contributing Gaussian-pixel pair."""
     alpha_min = 1 / 255
     rotation = camera.camera_to_world[:3, :3]
@@ -114,7 +124,8 @@ def projected_fragments(gaussians: Gaussians, camera: Camera):
     jacobian[:, 0, 2] = -fx*x/z**2
     jacobian[:, 1, 2] = -fy*y/z**2
     world_jacobian = jacobian @ rotation.T
-    covariance = world_jacobian @ gaussians.covariances[indices] @ world_jacobian.transpose(0, 2, 1)
+    world_covariance = gaussians.covariances[indices]
+    covariance = world_jacobian @ world_covariance @ world_jacobian.transpose(0, 2, 1)
     covariance += 0.3 * np.eye(2)
     support = np.sqrt(2 * np.log(gaussians.opacities[indices] / alpha_min))
     extent = support[:, None] * np.sqrt(covariance.diagonal(axis1=1, axis2=2))
@@ -125,6 +136,14 @@ def projected_fragments(gaussians: Gaussians, camera: Camera):
     counts = dimensions[:, 0] * dimensions[:, 1]
     active = np.flatnonzero(counts)
     pixels, gaussians_seen, alpha = [], [], []
+    if ray_depth:
+        rays = camera.rays()
+        camera_covariance = rotation.T @ world_covariance @ rotation
+        # Stabilize inversion for nearly flat ellipsoids at floating-point precision.
+        diagonal = np.max(camera_covariance.diagonal(axis1=-2, axis2=-1), axis=-1)
+        jitter = np.maximum(diagonal * (64 * np.finfo(float).eps), np.finfo(float).tiny)
+        precision = np.linalg.inv(camera_covariance + jitter[:, None, None] * np.eye(3))
+        ray_depths = []
     prefix = np.r_[0, np.cumsum(counts[active], dtype=np.int64)]
     start = 0
     while start < active.size:
@@ -144,16 +163,20 @@ def projected_fragments(gaussians: Gaussians, camera: Camera):
         values = gaussians.opacities[indices[fragments]] * np.exp(-0.5*quadratic)
         keep = values >= alpha_min
         pixels.append((py*camera.width + px)[keep])
-        gaussians_seen.append(fragments[keep])
+        visible = fragments[keep]
+        gaussians_seen.append(visible)
         alpha.append(np.minimum(values[keep], 0.99))
+        if ray_depth:
+            ray_depths.append(ray_gaussian_depth(rays[py[keep], px[keep]], centers[visible], precision[visible]))
         start = end
     if not pixels:
         return np.empty(0, int), np.empty(0), np.empty(0), np.empty((0, 3))
     splat = np.concatenate(gaussians_seen)
-    return np.concatenate(pixels), z[splat], np.concatenate(alpha), gaussians.colors[indices[splat]]
+    depths = np.concatenate(ray_depths) if ray_depth else z[splat]
+    return np.concatenate(pixels), depths, np.concatenate(alpha), gaussians.colors[indices[splat]]
 
 
-def add_layer_depths(result, p, z, ids, starts, counts, opacity, cumulative, minimum_gap, shape):
+def add_layer_depths(result, p, z, ids, starts, counts, opacity, cumulative, minimum_gap, shape, minimum_layer_mass=0.10):
     """Split rays at a wide gap with appreciable contribution on both sides."""
     size = opacity.size
     targets = cumulative[starts] + 0.5 * opacity[ids]
@@ -164,7 +187,7 @@ def add_layer_depths(result, p, z, ids, starts, counts, opacity, cumulative, min
     mass = from_start / opacity[p]
     gaps = np.r_[np.diff(z), 0.]
     same_ray = np.r_[p[1:] == p[:-1], False]
-    passes = same_ray & (gaps >= minimum_gap) & (mass >= 0.10) & (mass <= 0.90)
+    passes = same_ray & (gaps >= minimum_gap) & (mass >= minimum_layer_mass) & (mass <= 1 - minimum_layer_mass)
     widest = np.zeros(size)
     np.maximum.at(widest, p[passes], gaps[passes])
     winners = np.flatnonzero(passes & (gaps == widest[p]))
@@ -187,7 +210,8 @@ def add_layer_depths(result, p, z, ids, starts, counts, opacity, cumulative, min
     )
 
 
-def composite(pixels, depths, alpha, colors, shape, minimum_layer_gap=None):
+def composite(pixels, depths, alpha, colors, shape, minimum_layer_gap=None, *, minimum_layer_mass=0.10,
+              weak_layer_mass=None, spread_intervals=()):
     """Return expected depth, contribution statistics and optional layer depths."""
     size = int(np.prod(shape))
     if not len(pixels):
@@ -199,6 +223,10 @@ def composite(pixels, depths, alpha, colors, shape, minimum_layer_gap=None):
         if minimum_layer_gap is not None:
             empty.update({key: np.full(shape, np.nan) for key in ("median", "front", "back")})
             empty["layer_gap"] = np.zeros(shape)
+            if weak_layer_mass is not None:
+                empty["weak_layers"] = {key: empty[key] for key in ("front", "back", "layer_gap")}
+        if spread_intervals:
+            empty["alternative_spreads"] = {bounds: empty["spread"].copy() for bounds in spread_intervals}
         return empty
     order = np.lexsort((depths, pixels))
     p, z, a = pixels[order], depths[order], alpha[order]
@@ -214,29 +242,43 @@ def composite(pixels, depths, alpha, colors, shape, minimum_layer_gap=None):
     squared_diff = weights * (z - depth[p])**2
     std[ids] = np.sqrt(np.bincount(p, weights=squared_diff, minlength=size)[ids] / opacity[ids])
     contribution_prefix = np.r_[0, np.cumsum(weights)]
-    quantiles = []
-    for fraction in (0.1, 0.9):
+    def quantile_depth(fraction):
         targets = contribution_prefix[starts] + fraction * opacity[ids]
         hits = np.searchsorted(contribution_prefix, targets, side="left") - 1
         hits = np.clip(hits, starts, starts + counts - 1)
-        quantiles.append(z[hits])
-    spread = np.full(size, np.nan)
-    spread[ids] = quantiles[1] - quantiles[0]
+        return z[hits]
+
+    def depth_spread(bounds):
+        lower, upper = bounds
+        spread = np.full(size, np.nan)
+        spread[ids] = quantile_depth(upper) - quantile_depth(lower)
+        return spread.reshape(shape)
+
     rgb = np.column_stack([
         1 - opacity + np.bincount(p, weights=weights*colors[order, channel], minlength=size)
         for channel in range(3)
     ])
     result = {
         "depth": depth.reshape(shape), "opacity": opacity.reshape(shape),
-        "spread": spread.reshape(shape), "std": std.reshape(shape),
+        "spread": depth_spread((.10, .90)), "std": std.reshape(shape),
         "rgb": np.clip(rgb.reshape(*shape, 3), 0, 1),
     }
+    if spread_intervals:
+        result["alternative_spreads"] = {bounds: depth_spread(bounds) for bounds in spread_intervals}
     if minimum_layer_gap is not None:
-        add_layer_depths(result, p, z, ids, starts, counts, opacity, contribution_prefix, minimum_layer_gap, shape)
+        add_layer_depths(result, p, z, ids, starts, counts, opacity, contribution_prefix,
+                         minimum_layer_gap, shape, minimum_layer_mass)
+        if weak_layer_mass is not None:
+            weak = {}
+            add_layer_depths(weak, p, z, ids, starts, counts, opacity, contribution_prefix,
+                             minimum_layer_gap, shape, weak_layer_mass)
+            result["weak_layers"] = {key: weak[key] for key in ("front", "back", "layer_gap")}
     return result
 
 
-def render(gaussians: Gaussians, camera: Camera, minimum_layer_gap=None):
+def render(gaussians: Gaussians, camera: Camera, minimum_layer_gap=None, *, minimum_layer_mass=0.10,
+           weak_layer_mass=None, ray_depth=False, spread_intervals=()):
     return composite(
-        *projected_fragments(gaussians, camera), (camera.height, camera.width), minimum_layer_gap
+        *projected_fragments(gaussians, camera, ray_depth=ray_depth), (camera.height, camera.width), minimum_layer_gap,
+        minimum_layer_mass=minimum_layer_mass, weak_layer_mass=weak_layer_mass, spread_intervals=spread_intervals,
     )

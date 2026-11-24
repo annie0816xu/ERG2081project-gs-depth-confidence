@@ -15,8 +15,9 @@
 | [图 3 消融实验](figures/fig3_ablation.pdf) | 椅子和警示牌各 8 个视角，比较几何、RGB 和联合规则 |
 | [图 4 逐射线深度定量结果](figures/fig4_ray_depth_metrics.pdf) | 24 个视角的配对 MAE 变化和大误差像素比例 |
 | [图 5 逐射线深度局部对照](figures/fig5_ray_depth_views.pdf) | 椅子和电钻的改善实例，以及警示牌的退化实例 |
+| [图 6 三维点云验证](figures/fig6_surface.pdf) | 平均表面距离和离表面较远的点数如何变化 |
 
-[中文图注和图的来源](docs/FIGURES.md) · [实验报告](docs/REFINEMENT_REPORT.md) · [实验协议](docs/REFINEMENT_PROTOCOL.md)
+[中文图注和图的来源](docs/FIGURES.md) · [实验报告](docs/REFINEMENT_REPORT.md) · [实验协议](docs/REFINEMENT_PROTOCOL.md) · [分位数和三维验证](docs/VALIDATION.md)
 
 ## 仓库目录
 
@@ -74,5 +75,7 @@ python -m venv .venv
 用 `--weak-layer-check` 可在一次运行中比较原版 10%、统一 5% 和弱候选三票规则。三票规则先保留原版已加的修正，再核对新增候选。椅子、警示牌和新加入的电钻结果见[三票对照](docs/REFINEMENT_FOLLOWUP.md#弱候选三票规则)。
 
 `--ray-depth` 用每个像素射线上高斯响应最大的点计算深度。在椅子、警示牌和电钻上，逐射线深度配合 5% 几何规则将 MAE 分别降低 5.0%、2.8% 和 10.7%，对照为按高斯中心深度计算的 5% 几何版。[逐射线实验](docs/REFINEMENT_FOLLOWUP.md#逐射线高斯深度)
+
+把新旧深度反投影后，椅子和电钻到参考点云的平均距离在两套参考采样下都下降。电钻的离群点增加，警示牌的平均距离会随参考采样改变。运行 `python -m gsdepth.benchmarks.surface_validation --object chair` 可以生成配对点云。[三维验证详情](docs/VALIDATION.md)
 
 [公开 3DGS 数据与来源](https://huggingface.co/datasets/dxgl/multiview-datasets)

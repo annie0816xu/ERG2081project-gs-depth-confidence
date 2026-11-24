@@ -374,6 +374,46 @@ def ray_case_figure(directory, source_data, audit):
     save(figure, directory / "fig5_ray_depth_views", audit)
 
 
+def surface_figure(directory, evidence, audit):
+    figure, (mean, outliers) = plt.subplots(1, 2, figsize=(7.16, 2.65), sharey=True)
+    figure.subplots_adjust(left=.158, right=.971, top=.86, bottom=.26, wspace=.21)
+    heading(mean, "a", "Mean distance to reference")
+    heading(outliers, "b", "Off-surface points above 0.05")
+    outliers.axvline(0, color=GRAY, lw=.8, linestyle="--", zorder=0)
+
+    for row, dataset in enumerate(RAY_DATASETS):
+        path = evidence / "surface_validation" / dataset / "surface_metrics.csv"
+        with path.open(encoding="utf-8", newline="") as stream:
+            values = {entry["method"]: entry for entry in csv.DictReader(stream)}
+        center, ray = values["center"], values["ray"]
+        left, right = (1000 * float(method["mean_distance"]) for method in (ray, center))
+        mean.plot([left, right], [row + .045, row - .045], color=GRAY, lw=1.25, zorder=1)
+        mean.scatter(right, row - .045, s=28, facecolor="white", edgecolor=MUTED, linewidth=1.0, zorder=2)
+        mean.scatter(left, row + .045, s=24, color=BLUE, edgecolor="white", linewidth=.4, zorder=3)
+        change = int(ray["outliers_0.05"]) - int(center["outliers_0.05"])
+        color = TEAL if change < 0 else AMBER if change else MUTED
+        outliers.plot([0, change], [row, row], color=color, lw=1.1, zorder=1)
+        outliers.scatter(change, row, s=30, color=color, zorder=2)
+        outliers.annotate(f"{change:+d}" if change else "0", (change, row),
+                          xytext=(-5 if change < 0 else 5, 0), textcoords="offset points",
+                          va="center", ha="right" if change < 0 else "left", color=color, fontsize=7)
+
+    mean.set(yticks=np.arange(len(RAY_DATASETS)), yticklabels=list(RAY_DATASETS.values()), ylim=(2.54, -.54),
+             xlim=(8.0, 21.0), xticks=[10, 15, 20], xlabel="Distance (0.001 scene units)")
+    outliers.set(xlim=(-162, 162), xticks=[-150, -75, 0, 75, 150], xlabel="Change in number of points")
+    for axis in (mean, outliers):
+        axis.spines[["top", "right", "left"]].set_visible(False)
+        axis.tick_params(axis="y", length=0)
+        axis.tick_params(axis="x", length=2.5, width=.7)
+    outliers.tick_params(labelleft=False)
+    legend = [Line2D([0], [0], marker="o", linestyle="", markerfacecolor=fill, markeredgecolor=edge,
+                     markersize=4.2, label=label)
+              for fill, edge, label in (("white", MUTED, "Center depth"), (BLUE, BLUE, "Ray depth"))]
+    figure.legend(handles=legend, loc="lower center", bbox_to_anchor=(.35, .025), ncols=2,
+                  handletextpad=.3, columnspacing=1.2)
+    save(figure, directory / "fig6_surface", audit)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("figures"))
@@ -400,6 +440,7 @@ def main():
     ablation_figure(args.output, args.evidence, source_data, audit)
     ray_metrics_figure(args.output, args.evidence, source_data, audit)
     ray_case_figure(args.output, source_data, audit)
+    surface_figure(args.output, args.evidence, audit)
 
 
 if __name__ == "__main__":
